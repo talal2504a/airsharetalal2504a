@@ -14,6 +14,7 @@
 </head>
 <body>
 
+    <script>document.addEventListener('submit', function (e) { e.preventDefault(); });</script>
     <!-- ==================== HEADER ==================== -->
     <header class="site-header">
         <div class="container header-inner">
@@ -194,5 +195,6 @@
     <div id="toastWrap" class="toast-wrap" role="status" aria-live="polite"></div>
 
     <script src="/app.js"></script>
+    <form onsubmit="return false"></form>
 </body>
 </html>

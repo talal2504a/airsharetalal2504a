@@ -18,6 +18,7 @@ BEGIN
     (
         Id            INT IDENTITY(1,1) NOT NULL,
         NetworkIp     VARCHAR(45)    NOT NULL,
+        UploaderName  VARCHAR(50)   NULL,
         ShareType     VARCHAR(10)    NOT NULL,
         FileName      NVARCHAR(255)  NULL,
         StoredName    VARCHAR(100)   NULL,
@@ -57,7 +58,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes
 BEGIN
     CREATE NONCLUSTERED INDEX IX_Shares_NetworkIp_ExpiresAt
         ON dbo.Shares (NetworkIp, ExpiresAt)
-        INCLUDE (ShareType, FileName, FileSize, Code, CreatedAt, DownloadCount);
+        INCLUDE (ShareType, FileName, FileSize, Code, CreatedAt, DownloadCount, UploaderName);
 
     PRINT 'Index IX_Shares_NetworkIp_ExpiresAt created.';
 END
@@ -80,10 +81,6 @@ GO
 
 -- ---------------------------------------------------------------------
 -- Index 3: code lookup (cross-network download) — UNIQUE + FILTERED
---
---   Filtered isliye ki NULL codes ek dusre ko block na karein.
---   NOTE: Filtered index ke liye SET QUOTED_IDENTIFIER ON aur
---   SET ANSI_NULLS ON ZAROORI hain (error 1934 warna).
 -- ---------------------------------------------------------------------
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
@@ -102,17 +99,26 @@ END
 GO
 
 -- ---------------------------------------------------------------------
--- VERIFICATION — ye chalane se sab indexes confirm ho jayenge
+-- MIGRATION: UploaderName column
+-- Purane database me bhi add ho jayega (script pehle se chuka ho tab bhi safe)
 -- ---------------------------------------------------------------------
+IF COL_LENGTH('dbo.Shares', 'UploaderName') IS NULL
+BEGIN
+    ALTER TABLE dbo.Shares ADD UploaderName VARCHAR(50) NULL;
+    PRINT 'Column UploaderName added.';
+END
+ELSE
+BEGIN
+    PRINT 'Column UploaderName already exists — skipped.';
+END
+GO
+
 PRINT '';
 PRINT '=== Verification ===';
-
 SELECT
-    t.name       AS TableName,
-    i.name       AS IndexName,
-    i.type_desc  AS Type,
-    i.is_unique  AS IsUnique
-FROM sys.indexes i
-INNER JOIN sys.tables t ON t.object_id = i.object_id
-WHERE t.name = 'Shares' AND i.type <> 0
-ORDER BY i.name;
+    c.name AS ColumnName,
+    TYPE_NAME(c.user_type_id) AS DataType,
+    c.max_length AS MaxLength
+FROM sys.columns c
+WHERE c.object_id = OBJECT_ID('dbo.Shares')
+ORDER BY c.column_id;

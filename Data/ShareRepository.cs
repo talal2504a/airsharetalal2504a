@@ -1,5 +1,5 @@
-﻿using Dapper;
-using System.Data;
+﻿using System.Data;
+using Dapper;
 using AirShare.Models;
 using Microsoft.Data.SqlClient;
 
@@ -34,9 +34,11 @@ public class ShareRepository
     {
         const string sql = @"
             INSERT INTO dbo.Shares
-                (NetworkIp, ShareType, FileName, StoredName, TextContent, FileSize, Code, CreatedAt, ExpiresAt)
+                (NetworkIp, ShareType, FileName, StoredName, TextContent, FileSize, Code,
+                 CreatedAt, ExpiresAt, UploaderName)
             VALUES
-                (@NetworkIp, @ShareType, @FileName, @StoredName, @TextContent, @FileSize, @Code, @CreatedAt, @ExpiresAt);
+                (@NetworkIp, @ShareType, @FileName, @StoredName, @TextContent, @FileSize, @Code,
+                 @CreatedAt, @ExpiresAt, @UploaderName);
 
             SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
@@ -58,7 +60,7 @@ public class ShareRepository
         string networkIp, DateTime nowUtc)
     {
         const string sql = @"
-            SELECT Id, NetworkIp, ShareType, FileName, StoredName, FileSize, Code,
+            SELECT Id, NetworkIp, UploaderName, ShareType, FileName, StoredName, FileSize, Code,
                    CreatedAt, ExpiresAt, DownloadCount
             FROM dbo.Shares
             WHERE NetworkIp = @NetworkIp
@@ -80,7 +82,7 @@ public class ShareRepository
     public async Task<Share?> GetByIdAsync(int id)
     {
         const string sql = @"
-            SELECT Id, NetworkIp, ShareType, FileName, StoredName, TextContent,
+            SELECT Id, NetworkIp, UploaderName, ShareType, FileName, StoredName, TextContent,
                    FileSize, Code, CreatedAt, ExpiresAt, DownloadCount
             FROM dbo.Shares
             WHERE Id = @Id;";
@@ -98,7 +100,7 @@ public class ShareRepository
     public async Task<Share?> GetByCodeAsync(string code)
     {
         const string sql = @"
-            SELECT Id, NetworkIp, ShareType, FileName, StoredName, TextContent,
+            SELECT Id, NetworkIp, UploaderName, ShareType, FileName, StoredName, TextContent,
                    FileSize, Code, CreatedAt, ExpiresAt, DownloadCount
             FROM dbo.Shares
             WHERE Code = @Code;";
@@ -188,7 +190,7 @@ public class ShareRepository
     public async Task<IReadOnlyList<Share>> GetExpiredAsync(DateTime nowUtc)
     {
         const string sql = @"
-            SELECT Id, NetworkIp, ShareType, FileName, StoredName, FileSize, Code,
+            SELECT Id, NetworkIp, UploaderName, ShareType, FileName, StoredName, FileSize, Code,
                    CreatedAt, ExpiresAt, DownloadCount
             FROM dbo.Shares
             WHERE ExpiresAt <= @NowUtc;";

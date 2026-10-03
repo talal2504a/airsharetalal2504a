@@ -16,13 +16,19 @@ public class Share
     /// </summary>
     public string NetworkIp { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Uploader ka naam. Device name se auto-fill hota hai,
+    /// user manually badal bhi sakta hai.
+    /// </summary>
+    public string? UploaderName { get; set; }
+
     /// <summary>"file" ya "text". Sirf ye 2 values allowed (DB me CHECK constraint hai).</summary>
     public string ShareType { get; set; } = string.Empty;
 
     /// <summary>User ka original file name. Sirf download header me dikhta hai, disk path me KABHI use nahi hota.</summary>
     public string? FileName { get; set; }
 
-    /// <summary>Disk pe file ka naam —32-char GUID ("N" format) + sanitized extension. Jaise "a3f9...c2.txt"</summary>
+    /// <summary>Disk pe file ka naam — 32-char GUID ("N" format) + sanitized extension. Jaise "a3f9...c2.txt"</summary>
     public string? StoredName { get; set; }
 
     /// <summary>Text share ka poora content. File shares me NULL rehta hai.</summary>

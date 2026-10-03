@@ -1,6 +1,10 @@
 ﻿/* ==========================================================================
    AirShare — frontend logic (vanilla JS, no framework)
    ========================================================================== */
+// Sab forms ka default submit rok do (page reload nahi hoga)
+document.addEventListener('submit', function (e) {
+    e.preventDefault();
+});
 (function () {
     'use strict';
 

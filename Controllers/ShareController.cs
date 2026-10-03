@@ -44,7 +44,8 @@ public class ShareController : ControllerBase
 
     /// <summary>
     /// File ya text upload karo. Ek time pe sirf EK — dono nahi.
-    /// FormData fields: file (optional), text (optional), expiryMinutes (optional).
+    /// FormData fields: file (optional), text (optional),
+    ///                 expiryMinutes (optional), uploaderName (optional).
     /// </summary>
     [HttpPost("upload")]
     [EnableRateLimiting("uploads")]
@@ -52,7 +53,8 @@ public class ShareController : ControllerBase
     public async Task<ActionResult<UploadResult>> Upload(
         [FromForm(Name = "file")] IFormFile? file,
         [FromForm(Name = "text")] string? text,
-        [FromForm(Name = "expiryMinutes")] int? expiryMinutes)
+             [FromForm(Name = "expiryMinutes")] int? expiryMinutes,
+        [FromForm(Name = "uploaderName")] string? uploaderName)
     {
         var networkIp = _ipService.GetNetworkId(HttpContext);
         var now = DateTime.UtcNow;
@@ -116,6 +118,7 @@ public class ShareController : ControllerBase
             CreatedAt = now,
             ExpiresAt = now.AddMinutes(expiry),
             ShareType = hasFile ? "file" : "text",
+            UploaderName = SanitizeName(uploaderName),
             DownloadCount = 0
         };
 
@@ -256,6 +259,7 @@ public class ShareController : ControllerBase
                 : null,
 
             Code = s.Code,
+            UploaderName = s.UploaderName,
             CreatedAtUtc = DateTime.SpecifyKind(s.CreatedAt, DateTimeKind.Utc),
             ExpiresAtUtc = DateTime.SpecifyKind(s.ExpiresAt, DateTimeKind.Utc),
             DownloadCount = s.DownloadCount
@@ -312,7 +316,7 @@ public class ShareController : ControllerBase
         }
 
         if (!_storage.TryGetPath(share.StoredName ?? string.Empty, out var path)
-        || !System.IO.File.Exists(path))
+            || !System.IO.File.Exists(path))
         {
             return NotFound(new
             {
@@ -374,7 +378,8 @@ public class ShareController : ControllerBase
             });
         }
 
-        // Text share — JSON me content bhej do        if (!share.IsFile)
+        // Text share — JSON me content bhej do
+        if (!share.IsFile)
         {
             return Ok(new
             {
@@ -386,7 +391,7 @@ public class ShareController : ControllerBase
         }
 
         if (!_storage.TryGetPath(share.StoredName ?? string.Empty, out var path)
-           || !System.IO.File.Exists(path))
+            || !System.IO.File.Exists(path))
         {
             return NotFound(new
             {
@@ -474,6 +479,28 @@ public class ShareController : ControllerBase
     // ================================================================
 
     /// <summary>
+    /// Uploader ka naam sanitize karta hai.
+    /// DB column VARCHAR(50) hai — control chars aur path characters hata dete hain.
+    /// Naam khali ho to "Anonymous" rakhta hai.
+    /// </summary>
+    private static string SanitizeName(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "Anonymous";
+
+        var sb = new StringBuilder(input.Length);
+        foreach (var ch in input.Trim())
+        {
+            if (char.IsControl(ch)) continue;
+            if (ch is '"' or '\'' or '\\' or '/' or '<') continue;
+            sb.Append(ch);
+        }
+
+        var clean = sb.ToString().Trim();
+        if (clean.Length == 0) return "Anonymous";
+        return clean.Length > 50 ? clean[..50] : clean;
+    }
+
+    /// <summary>
     /// Text share ka suggested filename. First line se banata hai.
     /// Jaise "WiFi Password: 12345" -> "wifi-password-12345.txt"
     /// </summary>
@@ -528,6 +555,9 @@ public class ShareController : ControllerBase
 
         /// <summary>6-digit code.</summary>
         public string? Code { get; init; }
+
+        /// <summary>Uploader ka naam (device name ya user ka diya hua naam).</summary>
+        public string? UploaderName { get; init; }
 
         public DateTime CreatedAtUtc { get; init; }
         public DateTime ExpiresAtUtc { get; init; }
