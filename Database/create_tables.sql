@@ -5,6 +5,13 @@
  Script idempotent hai — dobara chalane se kuch nahi tootega.
 */
 
+-- NOTE: Ye SET options poori script ke shuru me ZAROORI hain.
+-- Filtered index (UX_Shares_Code) inke bina CREATE nahi hota
+-- (error 1934: "SET options have incorrect settings").
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 IF OBJECT_ID('dbo.Shares', 'U') IS NULL
 BEGIN
     CREATE TABLE dbo.Shares
@@ -73,8 +80,15 @@ GO
 
 -- ---------------------------------------------------------------------
 -- Index 3: code lookup (cross-network download) — UNIQUE + FILTERED
---   Filtered isliye ki NULL codes ek dusre ko block na karein
+--
+--   Filtered isliye ki NULL codes ek dusre ko block na karein.
+--   NOTE: Filtered index ke liye SET QUOTED_IDENTIFIER ON aur
+--   SET ANSI_NULLS ON ZAROORI hain (error 1934 warna).
 -- ---------------------------------------------------------------------
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes
     WHERE name = 'UX_Shares_Code'
       AND object_id = OBJECT_ID('dbo.Shares'))
@@ -86,3 +100,19 @@ BEGIN
     PRINT 'Unique index UX_Shares_Code created.';
 END
 GO
+
+-- ---------------------------------------------------------------------
+-- VERIFICATION — ye chalane se sab indexes confirm ho jayenge
+-- ---------------------------------------------------------------------
+PRINT '';
+PRINT '=== Verification ===';
+
+SELECT
+    t.name       AS TableName,
+    i.name       AS IndexName,
+    i.type_desc  AS Type,
+    i.is_unique  AS IsUnique
+FROM sys.indexes i
+INNER JOIN sys.tables t ON t.object_id = i.object_id
+WHERE t.name = 'Shares' AND i.type <> 0
+ORDER BY i.name;
