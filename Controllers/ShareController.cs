@@ -53,7 +53,7 @@ public class ShareController : ControllerBase
     public async Task<ActionResult<UploadResult>> Upload(
         [FromForm(Name = "file")] IFormFile? file,
         [FromForm(Name = "text")] string? text,
-             [FromForm(Name = "expiryMinutes")] int? expiryMinutes,
+        [FromForm(Name = "expiryMinutes")] int? expiryMinutes,
         [FromForm(Name = "uploaderName")] string? uploaderName)
     {
         var networkIp = _ipService.GetNetworkId(HttpContext);
@@ -260,6 +260,7 @@ public class ShareController : ControllerBase
 
             Code = s.Code,
             UploaderName = s.UploaderName,
+            NetworkIp = s.NetworkIp,
             CreatedAtUtc = DateTime.SpecifyKind(s.CreatedAt, DateTimeKind.Utc),
             ExpiresAtUtc = DateTime.SpecifyKind(s.ExpiresAt, DateTimeKind.Utc),
             DownloadCount = s.DownloadCount
@@ -558,6 +559,9 @@ public class ShareController : ControllerBase
 
         /// <summary>Uploader ka naam (device name ya user ka diya hua naam).</summary>
         public string? UploaderName { get; init; }
+
+        /// <summary>Uploader ka IP — grouping key, list me dikhata hai.</summary>
+        public string? NetworkIp { get; init; }
 
         public DateTime CreatedAtUtc { get; init; }
         public DateTime ExpiresAtUtc { get; init; }

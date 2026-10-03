@@ -7,14 +7,11 @@
     <meta name="color-scheme" content="dark light" />
     <title>AirShare — Share files &amp; text on the same WiFi</title>
 
-   
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-
     <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
 
-    <script>document.addEventListener('submit', function (e) { e.preventDefault(); });</script>
     <!-- ==================== HEADER ==================== -->
     <header class="site-header">
         <div class="container header-inner">
@@ -34,8 +31,15 @@
                 </span>
             </div>
 
+            <!-- LIVE DEVICE STATUS (new) -->
+            <div class="device-pill" id="devicePill" title="Devices on your network">
+                <span class="dp-dot" aria-hidden="true"></span>
+                <span id="deviceCount">1</span>
+                <span class="dp-label">device</span>
+            </div>
+
             <button id="themeToggle" class="icon-btn" type="button"
-                    aria-label="Switch between light and dark theme"
+                    aria-label="Switch theme"
                     title="Toggle light / dark">
                 <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -56,7 +60,27 @@
         <section class="card upload-card" aria-labelledby="upload-heading">
             <h2 id="upload-heading" class="visually-hidden">Share something</h2>
 
-            <!-- Tabs: File / Text -->
+            <!-- ---------- IDENTITY ROW (new component) ---------- -->
+            <div class="identity">
+                <div class="identity-avatar" id="avatar" aria-hidden="true">AS</div>
+
+                <div class="identity-fields">
+                    <div class="field">
+                        <label class="field-label" for="nameInput">Your name</label>
+                        <input type="text" id="nameInput" class="input" maxlength="50"
+                               placeholder="Detecting..." autocomplete="name" spellcheck="false" />
+                    </div>
+                    <div class="field">
+                        <label class="field-label">Network</label>
+                        <div class="ip-display" title="Items are grouped by this public IP">
+                            <span class="dot" aria-hidden="true"></span>
+                            <span id="networkIp">…</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---------- TABS ---------- -->
             <div class="tabs" role="tablist" aria-label="What do you want to share?">
                 <button class="tab is-active" id="tabFile" role="tab"
                         aria-selected="true" aria-controls="panelFile" type="button">
@@ -80,18 +104,14 @@
             <div id="panelFile" role="tabpanel" aria-labelledby="tabFile">
                 <div id="dropZone" class="dropzone" tabindex="0" role="button"
                      aria-label="Drop files here or tap to select">
-
                     <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M12 16V4" />
                         <path d="m7 9 5-5 5 5" />
                         <path d="M20 16.5A3.5 3.5 0 0 1 17 20H7a3.5 3.5 0 0 1-3-3.5" />
                     </svg>
-
                     <p class="dz-title">Drop files here or tap to select</p>
                     <p class="dz-hint" id="dzHint">Max 25 MB per file</p>
-
-                    <!-- Hidden native input, dropzone ke click se trigger hota hai -->
                     <input type="file" id="fileInput" multiple hidden />
                 </div>
 
@@ -100,14 +120,14 @@
 
             <!-- ---------- TEXT PANEL ---------- -->
             <div id="panelText" role="tabpanel" aria-labelledby="tabText" hidden>
-                <label class="field-label" for="textInput">Text ya notes paste karo</label>
+                <label class="field-label" for="textInput">Type or paste your text</label>
                 <textarea id="textInput" class="textarea" rows="7" maxlength="20000"
-                          placeholder="Type or paste anything here&#10;&#10;WiFi passwords, meeting notes, OTP codes…"
+                          placeholder="Anything you want to share…&#10;&#10;WiFi password, meeting notes, OTP codes…"
                           spellcheck="false"></textarea>
                 <p class="hint"><span id="charCount">0</span> / 20,000 characters</p>
             </div>
 
-            <!-- ---------- OPTIONS ROW ---------- -->
+            <!-- ---------- OPTIONS ---------- -->
             <div class="options">
                 <div class="field">
                     <label class="field-label" for="expirySelect">Auto-delete after</label>
@@ -129,7 +149,6 @@
                 </button>
             </div>
 
-            <!-- Progress bar, upload ke time dikhta hai -->
             <div id="progressWrap" class="progress-wrap" hidden>
                 <div class="progress-track" id="progressBar" role="progressbar"
                      aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
@@ -139,12 +158,11 @@
                 <span class="progress-label" id="progressLabel">0%</span>
             </div>
 
-            <!-- Success result + cross-network code -->
             <div id="resultBox" class="result-box" hidden>
                 <div class="result-text" id="resultText"></div>
                 <div class="code-row">
                     <div>
-                        <span class="code-label">Other-network code</span>
+                        <span class="code-label">Cross-network code</span>
                         <strong class="code-value" id="codeValue">------</strong>
                     </div>
                     <button id="copyCodeBtn" class="btn btn-ghost" type="button">Copy code</button>
@@ -156,10 +174,7 @@
         <section class="card list-card" aria-labelledby="list-heading">
             <div class="list-header">
                 <h2 id="list-heading">Available on your network</h2>
-                <span class="network-pill" title="Tumhara public IP — isi se group hota hai">
-                    <span class="dot" aria-hidden="true"></span>
-                    <span id="networkIp">…</span>
-                </span>
+                <span class="list-count" id="listCount" hidden>0 items</span>
             </div>
 
             <ul id="shareList" class="share-list" aria-live="polite" aria-busy="false"></ul>
@@ -170,8 +185,8 @@
                     <rect x="2" y="3" width="20" height="14" rx="2" />
                     <path d="M8 21h8M12 17v4" />
                 </svg>
-                <p>Nothing shared yet.</p>
-                <small>Upload something from another device on this WiFi.</small>
+                <p>Nothing shared yet</p>
+                <small>Upload something from another device on this WiFi</small>
             </div>
         </section>
 
@@ -191,10 +206,8 @@
         </div>
     </footer>
 
-    <!-- Toast notifications -->
     <div id="toastWrap" class="toast-wrap" role="status" aria-live="polite"></div>
 
     <script src="/app.js"></script>
-    <form onsubmit="return false"></form>
 </body>
 </html>
