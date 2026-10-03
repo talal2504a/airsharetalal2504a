@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
-		<!-- Spec ke mutabik net8.0. (.NET 10 SDK reference packs khud le leta hai) -->
+		<!-- Spec ke mutabik net8.0 (.NET 10 SDK reference packs khud le leta hai) -->
 		<TargetFramework>net8.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
@@ -10,7 +10,12 @@
 		<RootNamespace>AirShare</RootNamespace>
 		<AssemblyName>AirShare</AssemblyName>
 
-		<InvariantGlobalization>true</InvariantGlobalization>
+		<!--
+      NOTE: InvariantGlobalization yahan DELIBERATELY set nahi hai (default false).
+      Microsoft.Data.SqlClient ko proper locale data chahiye —
+      Invariant mode ON karne pe "Globalization Invariant Mode is not supported"
+      exception aata hai aur har DB query fail ho jaati hai.
+    -->
 	</PropertyGroup>
 
 	<ItemGroup>
