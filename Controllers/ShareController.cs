@@ -56,6 +56,9 @@ public class ShareController : ControllerBase
         [FromForm(Name = "expiryMinutes")] int? expiryMinutes,
         [FromForm(Name = "uploaderName")] string? uploaderName)
     {
+
+
+
         var networkIp = _ipService.GetNetworkId(HttpContext);
         var now = DateTime.UtcNow;
 
@@ -288,6 +291,19 @@ public class ShareController : ControllerBase
         var share = await _repo.GetByIdAsync(id);
 
         if (share is null)
+        {
+            return NotFound(new
+            {
+                success = false,
+                message = "Item not found — it may have expired."
+            });
+        }
+
+
+        // ---- Expired check ----
+        // Cleanup service 60 second chalta hai, isliye expired file
+        // disk pe abhi bhi ho sakti hai. Upar se download block karo.
+        if (share.ExpiresAt <= DateTime.UtcNow)
         {
             return NotFound(new
             {
