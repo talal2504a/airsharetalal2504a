@@ -1,43 +1,25 @@
-﻿# AirShare
+# AirShare
 
 **Live site:** https://yoursite.tryasp.net
 
-Same WiFi par file aur text share karo. **No login, no signup.**
+Share files and text over the same WiFi. **No login, no signup.**
 
-Kisi bhi device se file ya text upload karo → wo turant usi network ke
-baaki devices par dikhta hai → expiry ke baad apne aap delete ho jaata hai.
-
----
-
-## Table of contents
-
-- [Features](#features)
-- [Tech stack](#tech-stack)
-- [Project structure](#project-structure)
-- [How it works](#how-it-works)
-- [Setup (local)](#setup-local)
-- [API reference](#api-reference)
-- [Database](#database)
-- [Security](#security)
-- [Limits](#limits)
-- [Deploy to MonsterASP](#deploy-to-monsterasp)
-- [Troubleshooting](#troubleshooting)
-- [Build log / lessons](#build-log-lessons)
+Upload a file or text from any device → it instantly appears on every other device on the same network → it deletes itself after expiry.
 
 ---
 
 ## Features
 
-- **No authentication** — koi account nahi, koi signup nahi
-- **IP-based sharing** — same WiFi = same public IP = same list
-- **Auto refresh** — list har 3 second poll hoti hai
-- **Auto delete** — 10 / 15 / 30 / 60 minute expiry
-- **Text sharing** — WiFi password, OTP, notes (20,000 chars tak)
-- **Cross-network codes** — 6-digit code se doosre network se bhi download
-- **Device name + uploader IP** — list me dikhta hai kaun share kar raha hai
-- **Drag & drop** — progress bar ke saath
-- **Light / dark theme** — default dark, localStorage me save
-- **Responsive** — mobile-first, 44px+ tap targets
+- **No authentication**: no accounts, no signup
+- **IP-based sharing**: same WiFi = same public IP = same list
+- **Auto refresh**: the list polls every 3 seconds
+- **Auto delete**: 10 / 15 / 30 / 60 minute expiry
+- **Text sharing**: WiFi passwords, OTPs, notes (up to 20,000 chars)
+- **Cross-network codes**: download from another network using a 6-digit code
+- **Device name + uploader IP** shown in the list
+- **Drag & drop** with progress bar
+- **Light / dark theme**: dark by default, saved in localStorage
+- **Responsive**: mobile-first, 44px+ tap targets
 
 ---
 
@@ -47,8 +29,8 @@ baaki devices par dikhta hai → expiry ke baad apne aap delete ho jaata hai.
 |---|---|
 | Backend | ASP.NET Core 8 Web API (C#) |
 | ORM | Dapper (fully parameterized SQL) |
-| Database | MSSQL (SQL Server 2025) |
-| Frontend | Vanilla HTML / CSS / JS — **no framework** |
+| Database | MSSQL (SQL Server) |
+| Frontend | Vanilla HTML / CSS / JS (no framework) |
 | Cleanup | `BackgroundService` + `PeriodicTimer` |
 | Rate limiting | Built-in `AddRateLimiter` |
 | Hosting | MonsterASP.net (IIS, Web Deploy) |
@@ -59,98 +41,59 @@ baaki devices par dikhta hai → expiry ke baad apne aap delete ho jaata hai.
 
 ```
 share/
-├── AirShare.csproj                  Project file (net8.0, Dapper, SqlClient)
-├── Program.cs                       DI wiring, 3 size limits, rate limiter,
-│                                    forwarded headers, static files
-├── web.config                       IIS hosting + maxAllowedContentLength
-├── appsettings.json                 Config (connection string + limits)
-├── appsettings.Development.json     Local dev overrides
-├── .gitignore                       Secrets, build output, publish folders
-│
-├── Controllers/
-│   └── ShareController.cs           6 API endpoints + IP access control
-│
-├── Models/
-│   ├── Share.cs                     DB record (Id, NetworkIp, UploaderName, …)
-│   └── UploadResult.cs              Upload response DTO
-│
-├── Data/
-│   └── ShareRepository.cs           Dapper queries — all parameterized
-│
+├── AirShare.csproj
+├── Program.cs                  DI, size limits, rate limiter, forwarded headers
+├── web.config                  IIS config + maxAllowedContentLength
+├── appsettings.json
+├── Controllers/ShareController.cs   6 API endpoints + IP access control
+├── Models/                     Share, UploadResult
+├── Data/ShareRepository.cs     Parameterized Dapper queries
 ├── Services/
-│   ├── ClientIpService.cs           IP normalize (IPv4 as-is, IPv6 /48)
-│   ├── CodeGenerator.cs             Crypto-secure 6-digit code (RNG)
-│   ├── FileStorageService.cs        GUID naming, path traversal guard
-│   └── CleanupService.cs            BackgroundService — 60s expiry sweep
-│
-├── wwwroot/
-│   ├── index.html                   Single page UI
-│   ├── style.css                    Design tokens, light/dark themes
-│   ├── app.js                       Polling, upload (XHR), countdown, toasts
-│   ├── favicon.svg                  Logo
-│   ├── robots.txt                   Search engine rules
-│   ├── sitemap.xml                  Sitemap for Google
-│   └── google*.html                 Search Console verification file
-│
-├── App_Data/
-│   └── uploads/                     User files — NEVER served directly
-│
-└── Database/
-    └── create_tables.sql            Schema + 3 indexes (idempotent)
+│   ├── ClientIpService.cs      IP normalization (IPv4 as-is, IPv6 /48)
+│   ├── CodeGenerator.cs        Crypto-secure 6-digit codes
+│   ├── FileStorageService.cs   GUID naming, path traversal guard
+│   └── CleanupService.cs       60s expiry sweep
+├── wwwroot/                    index.html, style.css, app.js, favicon.svg
+├── App_Data/uploads/           User files (never served directly)
+└── Database/create_tables.sql  Schema + indexes (idempotent)
 ```
 
 ---
 
 ## How it works
 
-```
-  📱 Phone ─┐
-  💻 Laptop ─┼──► same public IP ──► /api/list ──► same shares
-  📱 Tablet ─┘
-```
-
-1. Upload → `POST /api/upload`
-2. Server real client IP resolve karta hai (`X-Forwarded-For` via `UseForwardedHeaders`)
-3. `ClientIpService.Normalize()` IP clean karta hai
-4. Row `NetworkIp` ke saath DB me save hoti hai
-5. Baaki devices `/api/list` call karte hain → wahi IP match → items dikhte hain
-6. Frontend har 3 second poll karta hai → naye items apne aap appear
-7. `CleanupService` har 60 second expired rows + files delete karta hai
+1. Client uploads via `POST /api/upload`.
+2. The server resolves the real client IP (`X-Forwarded-For` via `UseForwardedHeaders`).
+3. `ClientIpService.Normalize()` cleans the IP.
+4. The row is saved with its `NetworkIp`.
+5. Other devices call `/api/list`; matching IP → they see the items.
+6. The frontend polls every 3 seconds.
+7. `CleanupService` deletes expired rows and files every 60 seconds.
 
 ### IP grouping rules
 
 | Protocol | Rule |
 |---|---|
-| IPv4 | As-is — `203.0.113.42` |
-| IPv4-mapped IPv6 | Unwrap pehle — `::ffff:1.2.3.4` → `1.2.3.4` |
-| IPv6 | `/48` prefix — LAN ke saare devices same bucket |
+| IPv4 | As-is |
+| IPv4-mapped IPv6 | Unwrapped first (`::ffff:1.2.3.4` → `1.2.3.4`) |
+| IPv6 | `/48` prefix, so all LAN devices share one bucket |
 
-**IPv6 `/48` kyun?** Ghar ka router aksar IPv4 NAT + IPv6 direct dono deta hai.
-Phone IPv6 prefer karta hai, laptop IPv4 — dono alag dikhte hain.
-`/48` grouping se zyada devices same bucket me aa jaate hain.
-
-⚠️ **HTTPS zaroori hai.** HTTP par kuch networks IPv6 prefer karte hain
-jo IPv4/IPv6 mismatch create karta hai. SSL on karne se dono align ho jaate hain.
+> **HTTPS is required.** On plain HTTP some networks prefer IPv6, causing an IPv4/IPv6 mismatch between devices. Enabling SSL aligns them.
 
 ---
 
-## Setup (local)
+## Local setup
 
-### Prerequisites
-
-- .NET 8 SDK (ya .NET 10 SDK — csproj `net8.0` target karta hai)
-- SQL Server (LocalDB / Express / full)
-
-### Steps
+**Prerequisites:** .NET 8 SDK, SQL Server (LocalDB / Express / full)
 
 ```bash
-# 1. Database banao
+# 1. Create database
 sqlcmd -S "(localdb)\MSSQLLocalDB" -Q "CREATE DATABASE AirShare;"
 
-# 2. Tables + indexes
+# 2. Create tables
 sqlcmd -S "(localdb)\MSSQLLocalDB" -d AirShare -i Database\create_tables.sql
 
-# 3. Connection string — appsettings.json
+# 3. Set the connection string in appsettings.json
 #    "Server=(localdb)\\MSSQLLocalDB;Database=AirShare;Trusted_Connection=True;TrustServerCertificate=True"
 
 # 4. Run
@@ -158,7 +101,7 @@ dotnet restore
 dotnet run
 ```
 
-Browser me `https://localhost:7001` (ya jo bhi port aaye) kholo.
+Open `https://localhost:7001` (or whichever port is shown).
 
 ---
 
@@ -166,12 +109,12 @@ Browser me `https://localhost:7001` (ya jo bhi port aaye) kholo.
 
 | Method | Route | Description | Rate limit |
 |---|---|---|---|
-| POST | `/api/upload` | File ya text upload | 10/min/IP |
-| GET | `/api/list` | Caller ke IP ke active shares | — |
-| GET | `/api/download/{id}` | File download (same IP) | 60/min/IP |
+| POST | `/api/upload` | Upload file or text | 10/min/IP |
+| GET | `/api/list` | Active shares for caller's IP | none |
+| GET | `/api/download/{id}` | Download file (same IP) | 60/min/IP |
 | GET | `/api/download-by-code/{code}` | Cross-network download | 60/min/IP |
-| DELETE | `/api/share/{id}` | Manual delete (same IP) | — |
-| GET | `/api/text/{id}` | Text content (same IP) | — |
+| DELETE | `/api/share/{id}` | Manual delete (same IP) | none |
+| GET | `/api/text/{id}` | Text content (same IP) | none |
 
 ### Upload request
 
@@ -179,13 +122,13 @@ Browser me `https://localhost:7001` (ya jo bhi port aaye) kholo.
 POST /api/upload
 Content-Type: multipart/form-data
 
-file          (optional) — the file
-text          (optional) — text content
-expiryMinutes (optional) — 10 | 15 | 30 | 60
-uploaderName  (optional) — display name
+file          (optional) the file
+text          (optional) text content
+expiryMinutes (optional) 10 | 15 | 30 | 60
+uploaderName  (optional) display name
 ```
 
-Ek time pe **file ya text — dono nahi**.
+Send **either a file or text, not both**.
 
 ### List response
 
@@ -221,13 +164,13 @@ Ek time pe **file ya text — dono nahi**.
 |---|---|---|
 | `Id` | `INT IDENTITY` | PK |
 | `NetworkIp` | `VARCHAR(45)` | Grouping key |
-| `UploaderName` | `VARCHAR(50)` | Device name ya user ka naam |
+| `UploaderName` | `VARCHAR(50)` | Device or user name |
 | `ShareType` | `VARCHAR(10)` | `CHECK IN ('file','text')` |
 | `FileName` | `NVARCHAR(255)` | Original name (display only) |
 | `StoredName` | `VARCHAR(100)` | GUID name on disk |
-| `TextContent` | `NVARCHAR(MAX)` | Text share ka content |
+| `TextContent` | `NVARCHAR(MAX)` | Text share content |
 | `FileSize` | `BIGINT` | Bytes |
-| `Code` | `VARCHAR(6)` | `CHECK` digits only, `UNIQUE` filtered index |
+| `Code` | `VARCHAR(6)` | Digits only, unique filtered index |
 | `CreatedAt` | `DATETIME2(3)` | `DEFAULT SYSUTCDATETIME()` |
 | `ExpiresAt` | `DATETIME2(3)` | NOT NULL |
 | `DownloadCount` | `INT` | `DEFAULT 0` |
@@ -236,12 +179,11 @@ Ek time pe **file ya text — dono nahi**.
 
 | Index | Purpose |
 |---|---|
-| `IX_Shares_NetworkIp_ExpiresAt` | List query — `WHERE NetworkIp = ? AND ExpiresAt > ?` |
-| `IX_Shares_ExpiresAt` | Cleanup query — `WHERE ExpiresAt <= ?` |
-| `UX_Shares_Code` | **UNIQUE + FILTERED** — code lookup, NULLs block nahi karte |
+| `IX_Shares_NetworkIp_ExpiresAt` | List query |
+| `IX_Shares_ExpiresAt` | Cleanup query |
+| `UX_Shares_Code` | Unique + filtered, code lookup |
 
-> ⚠️ Filtered index ke liye `SET QUOTED_IDENTIFIER ON` aur `SET ANSI_NULLS ON`
-> zaroori hai — warna error 1934 aata hai. Script me set hai.
+> Filtered indexes require `SET QUOTED_IDENTIFIER ON` and `SET ANSI_NULLS ON` (already set in the script), otherwise error 1934 occurs.
 
 ---
 
@@ -249,59 +191,50 @@ Ek time pe **file ya text — dono nahi**.
 
 | Layer | Protection |
 |---|---|
-| SQL injection | Saari queries parameterized (`@param`) — zero concatenation |
-| Path traversal | `StoredName` regex + full-path recheck + root prefix verify |
-| Filenames on disk | Sirf `Guid.NewGuid()` + sanitized extension |
+| SQL injection | All queries parameterized |
+| Path traversal | `StoredName` regex + full-path recheck + root prefix check |
+| Filenames on disk | `Guid.NewGuid()` + sanitized extension only |
 | Dangerous uploads | 21 extensions blocked (`.exe .bat .cmd .ps1 .js .vbs .msi` …) |
-| IP spoofing | Client ka IP kabhi accept nahi hota — resolved address only |
-| Cross-network access | `403` jab caller IP share owner se match na kare |
-| Brute force | Rate limit 10 uploads/min, 60 downloads/min per IP |
-| Codes | `RandomNumberGenerator` (crypto-secure, uniform distribution) |
-| XSS | Frontend `textContent` — `innerHTML` sirf static SVG ke liye |
+| IP spoofing | Client-supplied IPs are never trusted |
+| Cross-network access | `403` if caller IP doesn't match the share owner |
+| Brute force | 10 uploads/min, 60 downloads/min per IP |
+| Codes | `RandomNumberGenerator` (crypto-secure) |
+| XSS | Frontend uses `textContent`; `innerHTML` only for static SVG |
 | Downloads | `Content-Disposition: attachment` |
-| Uploads folder | `wwwroot` ke bahar — kabhi directly serve nahi hota |
-| Expired shares | Cleanup 60s + download-time expiry check |
-| HTTPS | Production me forced |
+| Uploads folder | Outside `wwwroot`, never served directly |
+| Expired shares | Cleanup sweep + expiry check at download time |
+| HTTPS | Forced in production |
 
-**Privacy note:** IP grouping ka matlab hai **poore WiFi ke logon ko tumhari
-files dikhengi**. Public/shared WiFi pe sensitive data mat share karo.
-6-digit codes bhi technically guess ho sakte hain (rate limit ke saath slow).
+**Privacy note:** IP grouping means **everyone on the same WiFi can see your shares**. Don't share sensitive data on public WiFi. 6-digit codes are guessable in theory (rate limiting slows this down).
 
 ---
 
 ## Limits
 
-25 MB size limit **teen jagah** set hai — har layer alag check karti hai:
+The 25 MB limit is enforced in **three places**, and all must match:
 
-| # | Layer | Property |
-|---|---|---|
-| 1 | ASP.NET form reading | `FormOptions.MultipartBodyLengthLimit` |
-| 2 | Kestrel | `MaxRequestBodySize` |
-| 3 | IIS | `web.config` → `maxAllowedContentLength` |
+1. ASP.NET form reading: `FormOptions.MultipartBodyLengthLimit`
+2. Kestrel: `MaxRequestBodySize`
+3. IIS: `web.config` → `maxAllowedContentLength`
 
 | Limit | Value | Config key |
 |---|---|---|
 | Max file size | 25 MB | `AirShare:MaxFileSizeBytes` |
-| Max active shares / IP | 10 | `AirShare:MaxActiveSharesPerIp` |
+| Max active shares per IP | 10 | `AirShare:MaxActiveSharesPerIp` |
 | Max text length | 20,000 chars | `AirShare:MaxTextLength` |
 | Expiry options | 10/15/30/60 min | `AirShare:AllowedExpiryMinutes` |
 | Cleanup interval | 60 s | `AirShare:CleanupIntervalSeconds` |
-| Upload rate limit | 10 /min | `AirShare:UploadRateLimitPerMinute` |
+| Upload rate limit | 10/min | `AirShare:UploadRateLimitPerMinute` |
 
 ---
 
 ## Deploy to MonsterASP
 
-### 1. Panel setup
-
-1. Website banao → **"Empty website — no example"** chuno
-2. MSSQL database banao → SQL editor me `Database/create_tables.sql` run karo
-3. **Free SSL enable karo** ← zaroori (IPv4/IPv6 alignment ke liye)
-4. Database → **Web Deploy credentials** copy karo (port `8172`)
-
-### 2. Connection string
-
-`appsettings.Production.json` banao (ye `.gitignore` me hai — kabhi commit na ho):
+1. Create a website → choose **"Empty website — no example"**.
+2. Create an MSSQL database and run `Database/create_tables.sql` in the SQL editor.
+3. **Enable free SSL** (required for IPv4/IPv6 alignment).
+4. Copy the **Web Deploy credentials** (port `8172`).
+5. Create `appsettings.Production.json` (keep it in `.gitignore`):
 
 ```json
 {
@@ -311,144 +244,38 @@ files dikhengi**. Public/shared WiFi pe sensitive data mat share karo.
 }
 ```
 
-### 3. Web Deploy
-
-`Properties/PublishProfiles/MonsterASP.pubxml`:
-
-```xml
-<Project>
-  <PropertyGroup>
-    <Configuration>Release</Configuration>
-    <Platform>Any CPU</Platform>
-    <PublishProtocol>MsDeploy</PublishProtocol>
-    <SelfContained>false</SelfContained>
-    <WebDeployMethod>MSDeploy</WebDeployMethod>
-    <WebSiteName>yoursite</WebSiteName>
-    <ServiceURL>https://yoursite.siteasp.net:8172/msdeploy.axd</ServiceURL>
-    <MsDeployServiceUrl>https://yoursite.siteasp.net:8172/msdeploy.axd</MsDeployServiceUrl>
-    <MsDeploySiteName>yoursite</MsDeploySiteName>
-    <DeployIisAppPath>yoursite</DeployIisAppPath>
-    <UserName>yoursite</UserName>
-    <Password>***</Password>
-    <SavePassword>true</SavePassword>
-    <DeleteExistingFiles>true</DeleteExistingFiles>
-  </PropertyGroup>
-</Project>
-```
-
-Publish:
+6. Publish with Web Deploy (Visual Studio → **Publish**, or MSBuild with your publish profile):
 
 ```bash
-"C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" \
-  share.csproj /t:Publish /p:Configuration=Release /p:PublishProfile=MonsterASP
+MSBuild.exe share.csproj /t:Publish /p:Configuration=Release /p:PublishProfile=MonsterASP
 ```
 
-Ya Visual Studio me: project → **Publish** → profile select → **Publish**.
+7. Make sure `App_Data/uploads` has **Write** permission.
+8. Verify: `https://yoursite.tryasp.net/api/list` should return `{"networkIp":"...","serverTimeUtc":"...","items":[]}`.
 
-### 4. Permissions
-
-`App_Data/uploads` — **Write** permission ON (panel → file manager → permissions).
-`App_Data` IIS me by default writable hota hai.
-
-### 5. Verify
-
-```
-https://yoursite.tryasp.net/api/list
-```
-
-Expected: `{"networkIp":"...","serverTimeUtc":"...","items":[]}`
+> MonsterASP is **x86**, so use a **framework-dependent** publish (`processPath="dotnet"`, `arguments=".\AirShare.dll"`). Don't set `hostingModel` in `web.config`.
 
 ---
 
 ## Troubleshooting
 
-### Upload fail
-
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Request entity too large` | 3 size limits match nahi | Program.cs (×2) + web.config same rakho |
-| `File is too large` | App-level limit | `AirShare:MaxFileSizeBytes` badhao |
-| `blocked — unsafe file type` | Extension list | `.zip` / `.pdf` try karo |
-| `Too many requests` | Rate limit | 1 minute ruko |
-| 500 + log nahi | App start nahi hua | `web.config` `processPath` check karo |
-| Progress 0 pe atak gaya | Proxy timeout | Hosting support se baat karo |
+| `Request entity too large` | Size limits don't match | Align Program.cs (×2) and web.config |
+| `File is too large` | App-level limit | Raise `AirShare:MaxFileSizeBytes` |
+| `blocked — unsafe file type` | Extension blocklist | Try `.zip` / `.pdf` |
+| `Too many requests` | Rate limit | Wait 1 minute |
+| 500 with no logs | App didn't start | Check `processPath` in `web.config` |
+| Everyone has the same IP | `UseForwardedHeaders` not first | Make it the first middleware |
+| Phone ≠ laptop IP | IPv4 vs IPv6 mix | Enable SSL |
+| IP shows `unknown` | Proxy sent no header | Contact hosting support |
+| `Could not load 'Microsoft.Data.SqlClient'` | `runtimes/` folder not uploaded | Use Web Deploy |
+| Cleanup not running | Service not registered | Check logs for `Cleanup: N expired…` |
 
-### IP galat dikha raha hai
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| Sab ka same IP | `UseForwardedHeaders` first middleware nahi | Program.cs me sabse upar hona chahiye |
-| Phone ≠ laptop | **IPv4 vs IPv6 mix** | **SSL enable karo** ← yahi main reason tha |
-| IP `unknown` | Proxy ne header nahi bheja | Hosting support |
-| Har device alag | IPv6 privacy addresses | `/48` grouping (already implemented) |
-
-**Test:** `/api/list` kholo — JSON me `networkIp` dikhega. Dono devices pe compare karo.
-
-### Assembly load errors
-
-```
-FileNotFoundException: Could not load 'Microsoft.Data.SqlClient'
-```
-
-**Cause:** publish output ka `runtimes/` folder upload nahi hua.
-
-**Fix:** Web Deploy use karo (folder structure preserve karta hai), ya manually
-`runtimes\win-x86\native\Microsoft.Data.SqlClient.SNI.dll` upload karo.
-
-### Cleanup nahi ho raha
-
-App logs me dekho:
-
-```
-Cleanup: 5 expired me se 5 delete, 0 retry pending.
-```
-
-- `retry pending > 0` → file lock hai, agli cycle me retry hoga
-- Log hi nahi → `CleanupService` register nahi hua
-
-### 500 with empty body
-
-- `hostingModel` attribute web.config me mat rakho (.NET Core 3+ invalid)
-- Self-contained + `hostingModel="inprocess"` = conflict
-- Framework-dependent: `processPath="dotnet"` + `arguments=".\AirShare.dll"`
-
----
-
-## Build log / lessons
-
-Is project me jo issues aaye aur solve hue:
-
-1. **`InvariantGlobalization=true`** → SqlClient ko locale data chahiye,
-   "Globalization Invariant Mode is not supported" exception. Hat diya.
-
-2. **`IDbConnection` missing** → `using System.Data;` add kiya.
-
-3. **`File.Exists()` vs `ControllerBase.File()`** → conflict. `System.IO.File.Exists()`
-   explicitly use karna pada.
-
-4. **`hostingModel` attribute** → .NET 6+ me invalid, config reject hota tha.
-
-5. **`X-Forwarded-For` missing `runtimes/` folder** → FTP se folder structure
-   nahi gaya, `Microsoft.Data.SqlClient.SNI.dll` missing raha. **Web Deploy ne solve kiya.**
-
-6. **Self-contained + x64** → MonsterASP sirf **x86** hai. Bitness mismatch
-   ("HTTP Error 500.32 - Failed to load .NET Core host").
-   Solution: framework-dependent publish.
-
-7. **IPv4 vs IPv6** → phone IPv6, laptop IPv4 → alag IP → sharing fail.
-   **SSL enable karne se fix hua.** Ye biggest find tha.
-
-8. **CSS class mismatch** → `app.js` `btn-accent` use karta tha, CSS me `btn-ok`
-   tha → buttons invisible. Aliases add kiye.
-
-9. **`XHR responseText` throws** jab `responseType='json'` set ho.
-   Guard add kiya.
+**Quick IP test:** open `/api/list` on both devices and compare `networkIp`.
 
 ---
 
 ## License
 
-MIT — koi bhi use kar sakta hai.
-
-**Disclaimer:** Provided as-is, no warranty. Sensitive data share mat karo —
-WiFi par koi bhi ye dekh sakta hai.
+MIT. Provided as-is, with no warranty. Don't share sensitive data; anyone on the same WiFi can see it.
