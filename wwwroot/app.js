@@ -372,7 +372,10 @@
 
             xhr.addEventListener('load', function () {
                 let body = xhr.response;
-                if (!body && xhr.responseText) {
+
+                // responseType 'json' hone par responseText access THROWS
+                // (InvalidStateError) — isliye guard zaroori hai.
+                if (!body && xhr.responseType !== 'json') {
                     try { body = JSON.parse(xhr.responseText); } catch (_) { body = null; }
                 }
 

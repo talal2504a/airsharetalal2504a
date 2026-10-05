@@ -1,0 +1,16 @@
+# robots.txt — AirShare
+# Ye file search engines ko batata hai ki kya index karna hai.
+
+User-agent: *
+Allow: /
+
+# API endpoints ko index mat karo (koi fayda nahi, sirf spam)
+Disallow: /api/
+
+# App_Data aur logs kabhi public nahi hote, par khud se block kar dete hain
+Disallow: /App_Data/
+Disallow: /logs/
+
+# Crawl speed —Zyada chhota site hai, zaroorat nahi zyada crawl karne ki
+User-agent: *
+Crawl-delay: 1

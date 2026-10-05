@@ -11,6 +11,12 @@
 		<AssemblyName>AirShare</AssemblyName>
 
 		<!--
+      MonsterASP ka hosting sirf x86 hai, isliye win-x86 RID add kiya hai.
+      Self-contained publish ke liye zaroori hai.
+    -->
+		<RuntimeIdentifiers>win-x86;win-x64</RuntimeIdentifiers>
+
+		<!--
       NOTE: InvariantGlobalization yahan DELIBERATELY set nahi hai (default false).
       Microsoft.Data.SqlClient ko proper locale data chahiye —
       Invariant mode ON karne pe "Globalization Invariant Mode is not supported"

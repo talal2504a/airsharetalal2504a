@@ -82,11 +82,13 @@ public class ClientIpService : IClientIpService
                 return address.ToString();
             }
 
-            // /64 prefix = pehle 8 bytes. Baaki 8 bytes zero kar do.
+            // /48 prefix = pehle 6 bytes. /64 se zyada wide hai, isliye kuch
+            // ISPs/routers jo same LAN ko alag /64 blocks me dete hain,
+            // unke devices bhi same bucket me aa jaate hain.
             Span<byte> prefix = stackalloc byte[16];
-            v6.AsSpan(0, 8).CopyTo(prefix);
+            v6.AsSpan(0, 6).CopyTo(prefix);
 
-            // Format: 2001:db8:abcd:1234::  (DB me 45 chars me aa jayega)
+            // Format: 2409:8a34::  (DB me 45 chars me aa jayega)
             return new IPAddress(prefix).ToString();
         }
 

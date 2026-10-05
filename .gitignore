@@ -1,15 +1,26 @@
 ﻿## Secrets - kabhi commit na karein
 appsettings.Production.json
 *.publishsettings
+*.pubxml
 *.pubxml.user
 *.csproj.user
 *.slnx.user
+Properties/PublishProfiles/
+
+## Build / deploy logs
+msbuild*.log
+mb*.log
+*.log
 
 ## Visual Studio / build output
 .vs/
 bin/
 obj/
 logs/
+
+## Publish output (generated)
+publish/
+publish2/
 
 ## User uploaded data - kabhi repo me nahi
 App_Data/uploads/*
