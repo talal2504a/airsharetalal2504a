@@ -1,6 +1,6 @@
 ﻿# AirShare
 
-**Live site:** https://airshare.tryasp.net
+**Live site:** https://yoursite.tryasp.net
 
 Same WiFi par file aur text share karo. **No login, no signup.**
 
@@ -121,7 +121,7 @@ share/
 
 | Protocol | Rule |
 |---|---|
-| IPv4 | As-is — `163.227.212.95` |
+| IPv4 | As-is — `203.0.113.42` |
 | IPv4-mapped IPv6 | Unwrap pehle — `::ffff:1.2.3.4` → `1.2.3.4` |
 | IPv6 | `/48` prefix — LAN ke saare devices same bucket |
 
@@ -191,7 +191,7 @@ Ek time pe **file ya text — dono nahi**.
 
 ```json
 {
-  "networkIp": "163.227.212.95",
+  "networkIp": "203.0.113.42",
   "serverTimeUtc": "2026-10-05T10:58:41Z",
   "items": [
     {
@@ -202,7 +202,7 @@ Ek time pe **file ya text — dono nahi**.
       "textPreview": "hello",
       "code": "162710",
       "uploaderName": "Rahul",
-      "networkIp": "163.227.212.95",
+      "networkIp": "203.0.113.42",
       "createdAtUtc": "2026-10-05T10:10:33Z",
       "expiresAtUtc": "2026-10-05T10:25:33Z",
       "downloadCount": 0
@@ -323,12 +323,12 @@ files dikhengi**. Public/shared WiFi pe sensitive data mat share karo.
     <PublishProtocol>MsDeploy</PublishProtocol>
     <SelfContained>false</SelfContained>
     <WebDeployMethod>MSDeploy</WebDeployMethod>
-    <WebSiteName>site96214</WebSiteName>
-    <ServiceURL>https://site96214.siteasp.net:8172/msdeploy.axd</ServiceURL>
-    <MsDeployServiceUrl>https://site96214.siteasp.net:8172/msdeploy.axd</MsDeployServiceUrl>
-    <MsDeploySiteName>site96214</MsDeploySiteName>
-    <DeployIisAppPath>site96214</DeployIisAppPath>
-    <UserName>site96214</UserName>
+    <WebSiteName>yoursite</WebSiteName>
+    <ServiceURL>https://yoursite.siteasp.net:8172/msdeploy.axd</ServiceURL>
+    <MsDeployServiceUrl>https://yoursite.siteasp.net:8172/msdeploy.axd</MsDeployServiceUrl>
+    <MsDeploySiteName>yoursite</MsDeploySiteName>
+    <DeployIisAppPath>yoursite</DeployIisAppPath>
+    <UserName>yoursite</UserName>
     <Password>***</Password>
     <SavePassword>true</SavePassword>
     <DeleteExistingFiles>true</DeleteExistingFiles>
@@ -353,7 +353,7 @@ Ya Visual Studio me: project → **Publish** → profile select → **Publish**.
 ### 5. Verify
 
 ```
-https://airshare.tryasp.net/api/list
+https://yoursite.tryasp.net/api/list
 ```
 
 Expected: `{"networkIp":"...","serverTimeUtc":"...","items":[]}`
