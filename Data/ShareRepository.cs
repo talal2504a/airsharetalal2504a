@@ -54,14 +54,16 @@ public class ShareRepository
 
     /// <summary>
     /// Caller ke network ke ACTIVE (non-expired) shares, newest first.
-    /// Yahi query list endpoint chalti hai.
+    ///
+    /// NOTE: TextContent bhi SELECT karna ZAROORI hai — list endpoint uska
+    /// preview banata hai. Ye column miss hua to NullReferenceException aata hai.
     /// </summary>
     public async Task<IReadOnlyList<Share>> GetActiveByNetworkAsync(
         string networkIp, DateTime nowUtc)
     {
         const string sql = @"
-            SELECT Id, NetworkIp, UploaderName, ShareType, FileName, StoredName, FileSize, Code,
-                   CreatedAt, ExpiresAt, DownloadCount
+            SELECT Id, NetworkIp, UploaderName, ShareType, FileName, StoredName, TextContent,
+                   FileSize, Code, CreatedAt, ExpiresAt, DownloadCount
             FROM dbo.Shares
             WHERE NetworkIp = @NetworkIp
               AND ExpiresAt > @NowUtc
@@ -186,6 +188,7 @@ public class ShareRepository
     /// <summary>
     /// Expired shares (cleanup service ke liye).
     /// StoredName zaroori hai taaki disk se file delete ho sake.
+    /// TextContent ki zaroorat nahi — cleanup me content use nahi hota.
     /// </summary>
     public async Task<IReadOnlyList<Share>> GetExpiredAsync(DateTime nowUtc)
     {
