@@ -8,10 +8,10 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace AirShare.Controllers;
 
 /// <summary>
-/// Saari share API endpoints.
+/// All share API endpoints.
 ///
-/// SECURITY: har request pe caller's IP verify hota hai — doosre network
-/// ko kuch nahi milega. Sirf /download-by-code IP check NAHI karta (by design).
+/// SECURITY: every request validates the caller's IP — other networks get
+/// nothing. Only /download-by-code skips the IP check (by design).
 /// </summary>
 [ApiController]
 [Route("api")]
@@ -43,7 +43,7 @@ public class ShareController : ControllerBase
     // ================================================================
 
     /// <summary>
-    /// File ya text upload karo. Ek time pe sirf EK — dono nahi.
+    /// Upload a file OR text — never both at once.
     /// FormData fields: file (optional), text (optional),
     ///                 expiryMinutes (optional), uploaderName (optional).
     /// </summary>
@@ -67,7 +67,7 @@ public class ShareController : ControllerBase
             return BadRequest(new UploadResult
             {
                 Success = false,
-                Message = "Ek time pe sirf file ya sirf text bhejo."
+                Message = "Send either a file or text, not both."
             });
         }
 
@@ -76,11 +76,11 @@ public class ShareController : ControllerBase
             return BadRequest(new UploadResult
             {
                 Success = false,
-                Message = "Kuch share karna hai — file select karo ya text likho."
+                Message = "Nothing to share — select a file or type some text."
             });
         }
 
-        // ---- Expiry validate karo ----
+        // ---- Validate expiry ----
         var allowedExpiries = _config.GetSection("AirShare:AllowedExpiryMinutes").Get<int[]>()
             ?? new[] { 10, 15, 30, 60 };
 
@@ -92,7 +92,7 @@ public class ShareController : ControllerBase
             return BadRequest(new UploadResult
             {
                 Success = false,
-                Message = "Expiry time galat hai. Valid: "
+                Message = "Invalid expiry. Valid values: "
                           + string.Join(", ", allowedExpiries) + " minutes."
             });
         }
@@ -106,12 +106,12 @@ public class ShareController : ControllerBase
             return BadRequest(new UploadResult
             {
                 Success = false,
-                Message = $"Is network pe already {maxActive} active items hain. "
-                          + "Thodi der baad try karo."
+                Message = $"This network already has {maxActive} active items. "
+                          + "Try again later."
             });
         }
 
-        // ---- Share object banao ----
+        // ---- Build share object ----
         var share = new Share
         {
             NetworkIp = networkIp,
@@ -122,7 +122,7 @@ public class ShareController : ControllerBase
             DownloadCount = 0
         };
 
-        // ---- File handle ----
+        // ---- Handle file ----
         if (hasFile)
         {
             try
@@ -134,7 +134,7 @@ public class ShareController : ControllerBase
             }
             catch (InvalidOperationException ex)
             {
-                // Size ya extension validation fail — user ko message dikhao
+                // Size or extension validation failed — show message to user
                 return BadRequest(new UploadResult
                 {
                     Success = false,
@@ -143,18 +143,18 @@ public class ShareController : ControllerBase
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "File save fail. Network: {Ip}", networkIp);
+                _logger.LogError(ex, "File save failed. Network: {Ip}", networkIp);
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new UploadResult
                     {
                         Success = false,
-                        Message = "File save nahi ho payi. Baad me try karo."
+                        Message = "Could not save the file. Please try again."
                     });
             }
         }
         else
         {
-            // ---- Text handle ----
+            // ---- Handle text ----
             var maxText = _config.GetValue("AirShare:MaxTextLength", 20000);
             var content = text!.Trim();
 
@@ -163,7 +163,7 @@ public class ShareController : ControllerBase
                 return BadRequest(new UploadResult
                 {
                     Success = false,
-                    Message = $"Text bahut lamba hai. Max {maxText:N0} characters."
+                    Message = $"Text is too long. Maximum is {maxText:N0} characters."
                 });
             }
 
@@ -172,32 +172,32 @@ public class ShareController : ControllerBase
             share.FileSize = Encoding.UTF8.GetByteCount(content);
         }
 
-        // ---- Unique code generate karo ----
+        // ---- Generate unique code ----
         var code = await GenerateUniqueCodeAsync();
         share.Code = code;
 
-        // ---- DB me insert karo ----
+        // ---- Insert into DB ----
         try
         {
             share.Id = await _repo.InsertAsync(share);
         }
         catch (Exception ex)
         {
-            // Insert fail hua to orphan file mat chhodo — delete kar do
+            // Insert failed — delete the orphaned file so it does not linger
             if (hasFile && share.StoredName is not null)
             {
                 _storage.DeleteQuietly(share.StoredName);
             }
 
-            _logger.LogError(ex, "DB insert fail. Network: {Ip}", networkIp);
+            _logger.LogError(ex, "DB insert failed. Network: {Ip}", networkIp);
             return StatusCode(StatusCodes.Status500InternalServerError,
-                new UploadResult { Success = false, Message = "Share save nahi ho payi." });
+                new UploadResult { Success = false, Message = "Could not save the share." });
         }
 
         return StatusCode(StatusCodes.Status201Created, new UploadResult
         {
             Success = true,
-            Message = hasFile ? "File share ho gaya." : "Text share ho gaya.",
+            Message = hasFile ? "File shared successfully." : "Text shared successfully.",
             Id = share.Id,
             Code = share.Code,
             ExpiresAt = share.ExpiresAt
@@ -205,8 +205,8 @@ public class ShareController : ControllerBase
     }
 
     /// <summary>
-    /// Code generate karta hai aur DB se verify karta hai ki unique hai.
-    /// 6 digits = 1M combinations, isliye collision retries zaroori hain.
+    /// Generates a code and verifies uniqueness in the DB.
+    /// 6 digits = 1M combinations, so collision retries are necessary.
     /// </summary>
     private async Task<string> GenerateUniqueCodeAsync()
     {
@@ -224,7 +224,7 @@ public class ShareController : ControllerBase
                 candidate, attempt + 1);
         }
 
-        throw new InvalidOperationException("Unique code generate nahi ho paya.");
+        throw new InvalidOperationException("Could not generate a unique code.");
     }
 
     // ================================================================
@@ -232,7 +232,7 @@ public class ShareController : ControllerBase
     // ================================================================
 
     /// <summary>
-    /// Caller ke network ke active shares. Doosre network ko empty list milega.
+    /// Active shares for the caller's network. Other networks get an empty list.
     /// </summary>
     [HttpGet("list")]
     public async Task<ActionResult<ShareListResponse>> List()
@@ -250,8 +250,8 @@ public class ShareController : ControllerBase
             FileName = s.FileName,
             FileSize = s.FileSize,
 
-            // Text ka poora content list me NAHI bhejte — bandwidth bachane ke liye
-            // sirf preview. Full text /api/text/{id} se aayega.
+            // Full text content is NOT sent in the list — only a short preview,
+            // to save bandwidth. Full text comes from /api/text/{id}.
             TextPreview = s.IsText
                 ? (s.TextContent!.Length <= previewLength
                     ? s.TextContent
@@ -270,8 +270,7 @@ public class ShareController : ControllerBase
         {
             NetworkIp = networkIp,
 
-            // Server time bhejte hain — frontend clock compare karke
-            // countdown accurate rakhta hai
+            // Server time lets the frontend sync its countdown clock
             ServerTimeUtc = now,
             Items = items
         });
@@ -281,7 +280,7 @@ public class ShareController : ControllerBase
     // GET /api/download/{id}
     // ================================================================
 
-    /// <summary>File download — sirf wahi IP jisne upload kiya.</summary>
+    /// <summary>Download a file — only the uploading IP may do this.</summary>
     [HttpGet("download/{id:int}")]
     [EnableRateLimiting("downloads")]
     public async Task<IActionResult> Download(int id)
@@ -293,18 +292,18 @@ public class ShareController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Ye item nahi mila (expired ho gaya?)."
+                message = "Item not found — it may have expired."
             });
         }
 
-        // ---- CRITICAL: cross-network access block ----
+        // ---- CRITICAL: block cross-network access ----
         var networkIp = _ipService.GetNetworkId(HttpContext);
 
         if (!string.Equals(share.NetworkIp, networkIp, StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning("Blocked cross-network download. Share #{Id}", id);
             return StatusCode(StatusCodes.Status403Forbidden,
-                new { success = false, message = "Ye item tumhare network ka nahi hai." });
+                new { success = false, message = "This item is not on your network." });
         }
 
         if (!share.IsFile)
@@ -312,7 +311,7 @@ public class ShareController : ControllerBase
             return BadRequest(new
             {
                 success = false,
-                message = "Ye text share hai — Copy button use karo."
+                message = "This is a text share — use the Copy button instead."
             });
         }
 
@@ -322,14 +321,14 @@ public class ShareController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "File disk pe nahi mili."
+                message = "File not found on disk."
             });
         }
 
         await _repo.IncrementDownloadAsync(id);
 
-        // File() method automatically Content-Disposition: attachment set karta
-        // hai + ASCII fallback filename bhi deta hai (purane browsers ke liye)
+        // File() automatically sets Content-Disposition: attachment and
+        // provides an ASCII fallback filename for older browsers.
         var stream = new FileStream(
             path, FileMode.Open, FileAccess.Read, FileShare.Read,
             bufferSize: 64 * 1024, useAsync: true);
@@ -343,8 +342,8 @@ public class ShareController : ControllerBase
     // ================================================================
 
     /// <summary>
-    /// Cross-network download — user ke 6-digit code se.
-    /// Ye INTENTIONALLY IP check NAHI karta — isliye code ko secret maano.
+    /// Cross-network download via the 6-digit code.
+    /// This intentionally does NOT check IP — treat the code as a secret.
     /// </summary>
     [HttpGet("download-by-code/{code}")]
     [EnableRateLimiting("downloads")]
@@ -355,7 +354,7 @@ public class ShareController : ControllerBase
             return BadRequest(new
             {
                 success = false,
-                message = "Code 6 digits ka hona chahiye."
+                message = "Code must be exactly 6 digits."
             });
         }
 
@@ -366,7 +365,7 @@ public class ShareController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Ye code galat ya expired hai."
+                message = "Invalid or expired code."
             });
         }
 
@@ -375,11 +374,11 @@ public class ShareController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Ye code expire ho gaya."
+                message = "This code has expired."
             });
         }
 
-        // Text share — JSON me content bhej do
+        // Text share — return content as JSON
         if (!share.IsFile)
         {
             return Ok(new
@@ -397,7 +396,7 @@ public class ShareController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "File disk pe nahi mili."
+                message = "File not found on disk."
             });
         }
 
@@ -415,7 +414,7 @@ public class ShareController : ControllerBase
     // DELETE /api/share/{id}
     // ================================================================
 
-    /// <summary>Manual delete — sirf wahi IP jo owner hai.</summary>
+    /// <summary>Manual delete — only the owning IP may delete.</summary>
     [HttpDelete("share/{id:int}")]
     public async Task<ActionResult> Delete(int id)
     {
@@ -424,16 +423,16 @@ public class ShareController : ControllerBase
 
         if (share is null)
         {
-            return NotFound(new { success = false, message = "Item nahi mila." });
+            return NotFound(new { success = false, message = "Item not found." });
         }
 
         if (!string.Equals(share.NetworkIp, networkIp, StringComparison.OrdinalIgnoreCase))
         {
             return StatusCode(StatusCodes.Status403Forbidden,
-                new { success = false, message = "Ye item tumhare network ka nahi hai." });
+                new { success = false, message = "This item is not on your network." });
         }
 
-        // Pehle file hatao, phir row — taaki orphan file na rahe
+        // Delete the file first, then the row — avoids orphaned files
         if (share.IsFile && share.StoredName is not null)
         {
             _storage.DeleteQuietly(share.StoredName);
@@ -441,14 +440,14 @@ public class ShareController : ControllerBase
 
         await _repo.DeleteByIdAsync(id);
 
-        return Ok(new { success = true, message = "Delete ho gaya." });
+        return Ok(new { success = true, message = "Deleted." });
     }
 
     // ================================================================
     // GET /api/text/{id}
     // ================================================================
 
-    /// <summary>Text share ka full content — sirf same IP.</summary>
+    /// <summary>Full text content of a share — same IP only.</summary>
     [HttpGet("text/{id:int}")]
     public async Task<ActionResult> GetText(int id)
     {
@@ -456,7 +455,7 @@ public class ShareController : ControllerBase
 
         if (share is null)
         {
-            return NotFound(new { success = false, message = "Item nahi mila." });
+            return NotFound(new { success = false, message = "Item not found." });
         }
 
         var networkIp = _ipService.GetNetworkId(HttpContext);
@@ -464,12 +463,12 @@ public class ShareController : ControllerBase
         if (!string.Equals(share.NetworkIp, networkIp, StringComparison.OrdinalIgnoreCase))
         {
             return StatusCode(StatusCodes.Status403Forbidden,
-                new { success = false, message = "Ye item tumhare network ka nahi hai." });
+                new { success = false, message = "This item is not on your network." });
         }
 
         if (!share.IsText)
         {
-            return BadRequest(new { success = false, message = "Ye file share hai." });
+            return BadRequest(new { success = false, message = "This is a file share." });
         }
 
         return Ok(new { success = true, id = share.Id, text = share.TextContent });
@@ -480,9 +479,9 @@ public class ShareController : ControllerBase
     // ================================================================
 
     /// <summary>
-    /// Uploader ka naam sanitize karta hai.
-    /// DB column VARCHAR(50) hai — control chars aur path characters hata dete hain.
-    /// Naam khali ho to "Anonymous" rakhta hai.
+    /// Sanitizes the uploader's name.
+    /// DB column is VARCHAR(50) — strips control and path characters.
+    /// Falls back to "Anonymous" when the name is empty.
     /// </summary>
     private static string SanitizeName(string? input)
     {
@@ -502,8 +501,8 @@ public class ShareController : ControllerBase
     }
 
     /// <summary>
-    /// Text share ka suggested filename. First line se banata hai.
-    /// Jaise "WiFi Password: 12345" -> "wifi-password-12345.txt"
+    /// Builds a suggested filename for text shares from the first line.
+    /// "WiFi Password: 12345" becomes "wifi-password-12345.txt"
     /// </summary>
     private static string BuildTextFileName(string content)
     {
@@ -513,7 +512,7 @@ public class ShareController : ControllerBase
 
         var preview = firstLine.Length > 30 ? firstLine[..30] : firstLine;
 
-        // Filename me sirf safe characters rakho
+        // Keep only safe characters in the filename
         var safe = new string(preview
             .Select(ch => char.IsLetterOrDigit(ch) ? ch : '-')
             .ToArray());
@@ -525,16 +524,15 @@ public class ShareController : ControllerBase
     }
 
     // ================================================================
-    // DTOs
-    // File list exact rakhne ke liye yahin define hain (alag file nahi banayi)
+    // DTOs — defined here to keep the file list exactly as specified
     // ================================================================
 
     public sealed class ShareListResponse
     {
-        /// <summary>Caller ka network id — frontend header me dikhata hai.</summary>
+        /// <summary>Caller's network id — shown in the frontend header.</summary>
         public string NetworkIp { get; init; } = string.Empty;
 
-        /// <summary>Server ka UTC time — countdown sync ke liye.</summary>
+        /// <summary>Server UTC time — used to sync the countdown.</summary>
         public DateTime ServerTimeUtc { get; init; }
 
         public IReadOnlyList<ShareListItem> Items { get; init; }
@@ -545,22 +543,22 @@ public class ShareController : ControllerBase
     {
         public int Id { get; init; }
 
-        /// <summary>"file" ya "text".</summary>
+        /// <summary>"file" or "text".</summary>
         public string Type { get; init; } = string.Empty;
 
         public string? FileName { get; init; }
         public long? FileSize { get; init; }
 
-        /// <summary>Text ka chhota preview (list me dikhane ke liye).</summary>
+        /// <summary>Short text preview (for the list view).</summary>
         public string? TextPreview { get; init; }
 
         /// <summary>6-digit code.</summary>
         public string? Code { get; init; }
 
-        /// <summary>Uploader ka naam (device name ya user ka diya hua naam).</summary>
+        /// <summary>Uploader's name (device name or user-provided).</summary>
         public string? UploaderName { get; init; }
 
-        /// <summary>Uploader ka IP — grouping key, list me dikhata hai.</summary>
+        /// <summary>Uploader's IP — the grouping key, shown in the list.</summary>
         public string? NetworkIp { get; init; }
 
         public DateTime CreatedAtUtc { get; init; }
